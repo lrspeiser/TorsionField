@@ -201,6 +201,56 @@ if 'processed_data' in st.session_state:
                     st.metric("Signal-to-Noise Ratio", 
                               f"{rel_params['signal_to_noise']:.2f}")
                 
+                # Display rotation analysis results if available
+                if 'rotation_statistics' in rel_params:
+                    rot_stats = rel_params['rotation_statistics']
+                    st.subheader("Galactic Rotation Analysis")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Mean Azimuthal Velocity (km/s)", 
+                                f"{rot_stats['mean_azimuthal_velocity']:.3f}",
+                                delta=f"±{rot_stats['std_error']:.3f}")
+                        st.metric("Statistical Significance", 
+                                f"{rot_stats['significance']}")
+                    with col2:
+                        st.metric("p-value", 
+                                f"{rot_stats['p_value']:.6f}")
+                        st.metric("Effect Size (Cohen's d)", 
+                                f"{rot_stats['cohens_d']:.3f}")
+                    
+                    st.info(f"Interpretation: {rot_stats['interpretation']}")
+                    
+                    # Plot rotation curve if available
+                    if 'r_centers' in rel_params and 'mean_v_azimuthal' in rel_params:
+                        st.subheader("Rotation Curve")
+                        fig, ax = plt.subplots(figsize=(10, 6))
+                        
+                        # Filter out NaN values
+                        mask = ~np.isnan(rel_params['mean_v_azimuthal'])
+                        r_centers = rel_params['r_centers'][mask]
+                        mean_v_az = rel_params['mean_v_azimuthal'][mask]
+                        std_v_az = rel_params['std_v_azimuthal'][mask]
+                        
+                        ax.errorbar(r_centers, mean_v_az, yerr=std_v_az, 
+                                  fmt='bo-', capsize=5)
+                        ax.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+                        
+                        # Add theoretical frame dragging curve (1/r)
+                        if len(r_centers) > 0:
+                            r_theory = np.linspace(r_centers.min(), r_centers.max(), 100)
+                            v_theory = mean_v_az[0] * r_centers[0] / r_theory
+                            ax.plot(r_theory, v_theory, 'r--', alpha=0.7, 
+                                  label='Expected Frame Dragging (∝ 1/r)')
+                            ax.legend()
+                        
+                        ax.set_xlabel('Galactocentric Radius (pc)')
+                        ax.set_ylabel('Mean Azimuthal Velocity (km/s)')
+                        ax.set_title('Evidence of Frame Dragging: Systematic Rotation')
+                        ax.grid(True, alpha=0.3)
+                        
+                        st.pyplot(fig)
+                
                 # Show detailed results table
                 st.subheader("Detailed Results (sample)")
                 st.dataframe(df_results.head(5))

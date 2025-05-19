@@ -1,8 +1,137 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from astropy import units as u
 from astropy import constants as const
+from astropy.coordinates import SkyCoord, Galactic
 import streamlit as st
+from scipy import stats
+import seaborn as sns
+
+
+class FrameDraggingAnalyzer:
+    def __init__(self):
+        """Initialize the frame dragging analyzer for Gaia data."""
+        # Constants
+        self.G = 6.67430e-11  # Gravitational constant in m^3 kg^-1 s^-2
+        self.c = 299792458.0  # Speed of light in m/s
+        self.M_sun = 1.989e30  # Solar mass in kg
+        self.pc_to_m = 3.085677581e16  # Parsec to meters
+        
+    def calculate_galactic_velocities(self, df):
+        """
+        Convert proper motions to galactic coordinates and tangential velocities.
+        """
+        # Create a copy of the dataframe
+        df_result = df.copy()
+        
+        # Calculate distance from parallax (in parsecs)
+        df_result['distance_pc'] = 1000.0 / df_result['parallax']  # parallax in mas
+        
+        # Convert proper motions to velocity (km/s)
+        # 1 mas/yr * distance_pc = 4.74 km/s tangential velocity
+        v_l = df_result['pmra'] * df_result['distance_pc'] * 4.74 / 1000.0  # velocity in km/s
+        v_b = df_result['pmdec'] * df_result['distance_pc'] * 4.74 / 1000.0  # velocity in km/s
+        
+        # Add velocities to dataframe
+        df_result['v_l'] = v_l  # Tangential velocity in longitude direction
+        df_result['v_b'] = v_b  # Tangential velocity in latitude direction
+        
+        return df_result
+    
+    def detect_frame_dragging_signature(self, df, sgr_a_distance=8.122):
+        """
+        Look for systematic rotation signatures that would indicate frame dragging.
+        """
+        # Create a copy of the dataframe
+        df_result = df.copy()
+        
+        # Project stellar positions to galactocentric coordinates
+        # Assuming Sun is at sgr_a_distance kpc from galactic center
+        sun_distance = sgr_a_distance * 1000  # parsecs
+        
+        # Calculate galactocentric cartesian coordinates
+        df_result['x_gc'] = df_result['distance_pc'] * np.cos(df_result['b_rad']) * np.cos(df_result['l_rad']) - sun_distance
+        df_result['y_gc'] = df_result['distance_pc'] * np.cos(df_result['b_rad']) * np.sin(df_result['l_rad'])
+        df_result['z_gc'] = df_result['distance_pc'] * np.sin(df_result['b_rad'])
+        
+        # Calculate 3D distance to galactic center in parsecs
+        df_result['r_gc'] = np.sqrt(df_result['x_gc']**2 + df_result['y_gc']**2 + df_result['z_gc']**2)
+        
+        # Calculate azimuthal angle in galactocentric frame
+        df_result['theta_gc'] = np.arctan2(df_result['y_gc'], df_result['x_gc'])
+        
+        # Frame dragging would create systematic velocity in azimuthal direction
+        # Convert tangential velocities to galactocentric frame
+        v_radial_gc = df_result['v_l'] * np.cos(df_result['theta_gc']) + df_result['v_b'] * np.sin(df_result['theta_gc'])
+        v_azimuthal_gc = -df_result['v_l'] * np.sin(df_result['theta_gc']) + df_result['v_b'] * np.cos(df_result['theta_gc'])
+        
+        df_result['v_radial_gc'] = v_radial_gc
+        df_result['v_azimuthal_gc'] = v_azimuthal_gc
+        
+        return df_result
+    
+    def analyze_rotation_pattern(self, df):
+        """
+        Analyze if there's a systematic rotation pattern indicating frame dragging.
+        """
+        # Bin by galactocentric radius
+        r_bins = np.logspace(1, 3, 20)  # 10 to 1000 parsecs from center
+        r_centers = (r_bins[:-1] + r_bins[1:]) / 2
+        
+        mean_v_azimuthal = []
+        std_v_azimuthal = []
+        
+        for i in range(len(r_bins)-1):
+            mask = (df['r_gc'] >= r_bins[i]) & (df['r_gc'] < r_bins[i+1])
+            if np.sum(mask) > 10:  # Need enough stars in bin
+                v_az_bin = df[mask]['v_azimuthal_gc']
+                mean_v_azimuthal.append(np.mean(v_az_bin))
+                std_v_azimuthal.append(np.std(v_az_bin) / np.sqrt(len(v_az_bin)))
+            else:
+                mean_v_azimuthal.append(np.nan)
+                std_v_azimuthal.append(np.nan)
+        
+        return r_centers, np.array(mean_v_azimuthal), np.array(std_v_azimuthal)
+    
+    def statistical_significance_test(self, df):
+        """
+        Test statistical significance of observed rotation.
+        """
+        v_azimuthal = df['v_azimuthal_gc'].dropna()
+        
+        # Test if mean is significantly different from zero
+        t_stat, p_value = stats.ttest_1samp(v_azimuthal, 0)
+        
+        # Calculate effect size (Cohen's d)
+        cohen_d = np.abs(np.mean(v_azimuthal)) / np.std(v_azimuthal)
+        
+        results = {
+            'sample_size': len(v_azimuthal),
+            'mean_azimuthal_velocity': np.mean(v_azimuthal),
+            'std_error': np.std(v_azimuthal)/np.sqrt(len(v_azimuthal)),
+            'std_deviation': np.std(v_azimuthal),
+            't_statistic': t_stat,
+            'p_value': p_value,
+            'cohens_d': cohen_d
+        }
+        
+        # Add interpretation
+        if p_value < 0.001:
+            results['significance'] = "Highly significant"
+            if cohen_d > 0.1:
+                results['interpretation'] = "Strong evidence of frame dragging"
+            else:
+                results['interpretation'] = "Statistically significant but small effect"
+        elif p_value < 0.05:
+            results['significance'] = "Significant"
+            results['interpretation'] = "Moderate evidence of frame dragging"
+        else:
+            results['significance'] = "Not significant"
+            results['interpretation'] = "No significant evidence of frame dragging"
+            
+        return results
+
 
 def calculate_frame_dragging_signatures(df, sgr_a_mass=4.152e6, sgr_a_distance=8.122, sgr_a_spin=0.9):
     """
@@ -24,14 +153,20 @@ def calculate_frame_dragging_signatures(df, sgr_a_mass=4.152e6, sgr_a_distance=8
     pandas.DataFrame
         DataFrame with original data and frame dragging calculations
     """
-    # Create a copy of the dataframe
-    df_result = df.copy()
+    # Create analyzer instance
+    analyzer = FrameDraggingAnalyzer()
     
-    # Constants
-    G = const.G.value  # Gravitational constant in m^3 kg^-1 s^-2
-    c = const.c.value  # Speed of light in m/s
-    M_sun = const.M_sun.value  # Solar mass in kg
-    pc_to_m = const.pc.value  # Parsec to meters
+    # First calculate galactic velocities
+    df_result = analyzer.calculate_galactic_velocities(df)
+    
+    # Detect frame dragging signatures using the advanced analyzer
+    df_result = analyzer.detect_frame_dragging_signature(df_result, sgr_a_distance=sgr_a_distance)
+    
+    # Get constants from the analyzer
+    G = analyzer.G
+    c = analyzer.c
+    M_sun = analyzer.M_sun
+    pc_to_m = analyzer.pc_to_m
     
     # Convert inputs to standard SI units
     M_sgr_a = sgr_a_mass * M_sun  # Mass in kg
@@ -39,15 +174,6 @@ def calculate_frame_dragging_signatures(df, sgr_a_mass=4.152e6, sgr_a_distance=8
     
     # Calculate Schwarzschild radius
     R_s = 2 * G * M_sgr_a / (c**2)  # Schwarzschild radius in meters
-    
-    # Process each star
-    # Calculate 3D position (approximation, assuming galactic center is at l=0, b=0)
-    df_result['x_gc'] = df_result['distance_pc'] * np.cos(df_result['b_rad']) * np.cos(df_result['l_rad']) - sgr_a_distance * 1000
-    df_result['y_gc'] = df_result['distance_pc'] * np.cos(df_result['b_rad']) * np.sin(df_result['l_rad'])
-    df_result['z_gc'] = df_result['distance_pc'] * np.sin(df_result['b_rad'])
-    
-    # Calculate 3D distance to galactic center in parsecs
-    df_result['r_gc'] = np.sqrt(df_result['x_gc']**2 + df_result['y_gc']**2 + df_result['z_gc']**2)
     
     # Convert to meters for calculations
     r_gc_m = df_result['r_gc'] * pc_to_m
@@ -166,11 +292,14 @@ def calculate_relativistic_parameters(df_results, sgr_a_mass=4.152e6, sgr_a_dist
     dict
         Dictionary with relativistic parameters
     """
-    # Constants
-    G = const.G.value  # Gravitational constant in m^3 kg^-1 s^-2
-    c = const.c.value  # Speed of light in m/s
-    M_sun = const.M_sun.value  # Solar mass in kg
-    pc_to_m = const.pc.value  # Parsec to meters
+    # Create analyzer instance for constants
+    analyzer = FrameDraggingAnalyzer()
+    
+    # Get constants
+    G = analyzer.G
+    c = analyzer.c
+    M_sun = analyzer.M_sun
+    pc_to_m = analyzer.pc_to_m
     
     # Convert inputs to standard SI units
     M_sgr_a = sgr_a_mass * M_sun  # Mass in kg
@@ -226,19 +355,45 @@ def calculate_relativistic_parameters(df_results, sgr_a_mass=4.152e6, sgr_a_dist
     pm_error_mean = np.sqrt(df_results['pmra_error']**2 + df_results['pmdec_error']**2).mean()
     fd_larger_than_error = (df_results['fd_effect_mag'] > pm_error_mean).mean()
     
-    # Return all parameters as a dictionary
-    params = {
-        'schwarzschild_radius_pc': R_s_pc,
-        'influence_radius_pc': influence_radius_pc,
-        'orbital_period_1pc_yr': orbital_period_1pc_yr,
-        'frame_dragging_timescale_yr': fd_timescale_yr,
-        'einstein_radius_as': einstein_radius_as,
-        'mean_fd_snr': mean_snr,
-        'median_fd_snr': median_snr,
-        'max_fd_snr': max_snr,
-        'detectable_fraction': detectable_fraction,
-        'signal_to_noise': overall_snr,
-        'fd_larger_than_error_fraction': fd_larger_than_error
-    }
+    # Add advanced statistical analysis
+    if 'v_azimuthal_gc' in df_results.columns:
+        # Get rotation pattern analysis
+        analyzer = FrameDraggingAnalyzer()
+        r_centers, mean_v_az, std_v_az = analyzer.analyze_rotation_pattern(df_results)
+        rotation_stats = analyzer.statistical_significance_test(df_results)
+        
+        # Return all parameters as a dictionary
+        params = {
+            'schwarzschild_radius_pc': R_s_pc,
+            'influence_radius_pc': influence_radius_pc,
+            'orbital_period_1pc_yr': orbital_period_1pc_yr,
+            'frame_dragging_timescale_yr': fd_timescale_yr,
+            'einstein_radius_as': einstein_radius_as,
+            'mean_fd_snr': mean_snr,
+            'median_fd_snr': median_snr,
+            'max_fd_snr': max_snr,
+            'detectable_fraction': detectable_fraction,
+            'signal_to_noise': overall_snr,
+            'fd_larger_than_error_fraction': fd_larger_than_error,
+            'rotation_statistics': rotation_stats,
+            'r_centers': r_centers,
+            'mean_v_azimuthal': mean_v_az,
+            'std_v_azimuthal': std_v_az
+        }
+    else:
+        # Return all parameters without rotation analysis
+        params = {
+            'schwarzschild_radius_pc': R_s_pc,
+            'influence_radius_pc': influence_radius_pc,
+            'orbital_period_1pc_yr': orbital_period_1pc_yr,
+            'frame_dragging_timescale_yr': fd_timescale_yr,
+            'einstein_radius_as': einstein_radius_as,
+            'mean_fd_snr': mean_snr,
+            'median_fd_snr': median_snr,
+            'max_fd_snr': max_snr,
+            'detectable_fraction': detectable_fraction,
+            'signal_to_noise': overall_snr,
+            'fd_larger_than_error_fraction': fd_larger_than_error
+        }
     
     return params

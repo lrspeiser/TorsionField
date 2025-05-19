@@ -4,6 +4,7 @@ import gzip
 from pathlib import Path
 import streamlit as st
 from io import BytesIO
+import io
 
 def load_local_gaia_files(file_paths, sample_size=50000, filter_params=None):
     """
@@ -48,9 +49,11 @@ def load_local_gaia_files(file_paths, sample_size=50000, filter_params=None):
         try:
             # Read compressed CSV
             with gzip.open(file_path, 'rt') as f:
+                content = f.read()
                 # Read in chunks to manage memory
                 chunk_size = 10000
-                for chunk in pd.read_csv(f, chunksize=chunk_size, low_memory=False):
+                string_data = io.StringIO(content)
+                for chunk in pd.read_csv(string_data, chunksize=chunk_size, low_memory=False):
                     
                     # Filter for good quality data
                     mask = (
