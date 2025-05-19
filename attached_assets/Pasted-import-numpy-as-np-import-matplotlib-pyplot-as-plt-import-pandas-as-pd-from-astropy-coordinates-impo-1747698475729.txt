@@ -1,0 +1,249 @@
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from astropy.coordinates import SkyCoord, Galactic
+from astropy import units as u
+from astroquery.gaia import Gaia
+import seaborn as sns
+
+class FrameDraggingAnalyzer:
+    def __init__(self):
+        """Initialize the frame dragging analyzer for Gaia data."""
+        # Enable anonymous access to Gaia
+        Gaia.MAIN_GAIA_TABLE = "gaiadr3.gaia_source"
+        
+    def download_gaia_subset(self, num_stars=100000):
+        """
+        Download a subset of Gaia data with good astrometric measurements.
+        """
+        # Query for stars with good proper motion measurements
+        query = f"""
+        SELECT TOP {num_stars}
+            source_id, ra, dec, pmra, pmdec, radial_velocity,
+            parallax, phot_g_mean_mag, l, b,
+            pmra_error, pmdec_error, radial_velocity_error
+        FROM gaiadr3.gaia_source
+        WHERE pmra IS NOT NULL 
+            AND pmdec IS NOT NULL
+            AND pmra_error < 1.0
+            AND pmdec_error < 1.0
+            AND abs(b) > 10  -- Avoid galactic plane extinction
+            AND phot_g_mean_mag < 16  -- Bright enough for good measurements
+            AND parallax > 0.1  -- Relatively nearby for better precision
+        """
+        
+        print("Downloading Gaia data...")
+        job = Gaia.launch_job_async(query)
+        return job.get_results().to_pandas()
+    
+    def calculate_galactic_velocities(self, df):
+        """
+        Convert proper motions to galactic coordinates and tangential velocities.
+        """
+        # Convert to galactic coordinates
+        coords = SkyCoord(ra=df['ra']*u.deg, dec=df['dec']*u.deg, frame='icrs')
+        galactic = coords.galactic
+        
+        # Calculate distance from parallax (in parsecs)
+        distance_pc = 1.0 / df['parallax']  # parallax in arcsec
+        
+        # Convert proper motions to velocity (km/s)
+        # 1 mas/yr * distance_pc = 4.74 km/s tangential velocity
+        v_l = df['pmra'] * distance_pc * 4.74  # velocity in galactic longitude direction
+        v_b = df['pmdec'] * distance_pc * 4.74  # velocity in galactic latitude direction
+        
+        # Add galactic coordinates and velocities to dataframe
+        df['l'] = galactic.l.deg
+        df['b'] = galactic.b.deg
+        df['distance_pc'] = distance_pc
+        df['v_l'] = v_l  # Tangential velocity in longitude direction
+        df['v_b'] = v_b  # Tangential velocity in latitude direction
+        
+        return df
+    
+    def detect_frame_dragging_signature(self, df):
+        """
+        Look for systematic rotation signatures that would indicate frame dragging.
+        """
+        # Calculate galactocentric radius (approximate)
+        # Assume Sun is at 8.2 kpc from galactic center
+        sun_distance = 8200  # parsecs
+        
+        # Project stellar positions to galactocentric coordinates
+        x_gc = df['distance_pc'] * np.cos(np.radians(df['l'])) - sun_distance
+        y_gc = df['distance_pc'] * np.sin(np.radians(df['l']))
+        r_gc = np.sqrt(x_gc**2 + y_gc**2)
+        
+        # Calculate azimuthal angle in galactocentric frame
+        theta_gc = np.arctan2(y_gc, x_gc)
+        
+        # Frame dragging would create systematic velocity in azimuthal direction
+        # Convert tangential velocities to galactocentric frame
+        v_radial_gc = df['v_l'] * np.cos(theta_gc) + df['v_b'] * np.sin(theta_gc)
+        v_azimuthal_gc = -df['v_l'] * np.sin(theta_gc) + df['v_b'] * np.cos(theta_gc)
+        
+        df['r_gc'] = r_gc
+        df['theta_gc'] = theta_gc
+        df['v_radial_gc'] = v_radial_gc
+        df['v_azimuthal_gc'] = v_azimuthal_gc
+        
+        return df
+    
+    def analyze_rotation_pattern(self, df):
+        """
+        Analyze if there's a systematic rotation pattern indicating frame dragging.
+        """
+        # Bin by galactocentric radius
+        r_bins = np.logspace(1, 2, 20)  # 10 to 100 parsecs from center
+        r_centers = (r_bins[:-1] + r_bins[1:]) / 2
+        
+        mean_v_azimuthal = []
+        std_v_azimuthal = []
+        
+        for i in range(len(r_bins)-1):
+            mask = (df['r_gc'] >= r_bins[i]) & (df['r_gc'] < r_bins[i+1])
+            if np.sum(mask) > 10:  # Need enough stars in bin
+                v_az_bin = df[mask]['v_azimuthal_gc']
+                mean_v_azimuthal.append(np.mean(v_az_bin))
+                std_v_azimuthal.append(np.std(v_az_bin) / np.sqrt(len(v_az_bin)))
+            else:
+                mean_v_azimuthal.append(np.nan)
+                std_v_azimuthal.append(np.nan)
+        
+        return r_centers, np.array(mean_v_azimuthal), np.array(std_v_azimuthal)
+    
+    def plot_frame_dragging_evidence(self, df, r_centers, mean_v_az, std_v_az):
+        """
+        Create plots that would show evidence of frame dragging.
+        """
+        fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(15, 12))
+        
+        # Plot 1: Systematic azimuthal velocity vs radius
+        mask = ~np.isnan(mean_v_az)
+        ax1.errorbar(r_centers[mask], mean_v_az[mask], yerr=std_v_az[mask], 
+                    fmt='bo-', capsize=5)
+        ax1.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+        ax1.set_xlabel('Galactocentric Radius (pc)')
+        ax1.set_ylabel('Mean Azimuthal Velocity (km/s)')
+        ax1.set_title('Evidence of Frame Dragging: Systematic Rotation')
+        ax1.grid(True, alpha=0.3)
+        
+        # Add expected frame dragging curve (theoretical)
+        # Frame dragging velocity ∝ 1/r for distances >> gravitational radius
+        if np.any(mask):
+            r_theory = r_centers[mask]
+            # Normalize to show expected 1/r dependence
+            v_theory = mean_v_az[mask][0] * r_centers[mask][0] / r_theory
+            ax1.plot(r_theory, v_theory, 'r--', alpha=0.7, 
+                    label='Expected Frame Dragging (∝ 1/r)')
+            ax1.legend()
+        
+        # Plot 2: 2D velocity field showing rotation
+        sample_mask = np.random.choice(len(df), min(5000, len(df)), replace=False)
+        sample_df = df.iloc[sample_mask]
+        
+        sc = ax2.scatter(sample_df['l'], sample_df['b'], 
+                        c=sample_df['v_azimuthal_gc'], 
+                        cmap='RdBu_r', s=1, vmin=-50, vmax=50)
+        ax2.set_xlabel('Galactic Longitude (deg)')
+        ax2.set_ylabel('Galactic Latitude (deg)')
+        ax2.set_title('Azimuthal Velocity Field (Frame Dragging Signature)')
+        plt.colorbar(sc, ax=ax2, label='Azimuthal Velocity (km/s)')
+        
+        # Plot 3: Velocity distribution
+        ax3.hist(df['v_azimuthal_gc'].dropna(), bins=50, alpha=0.7, density=True)
+        ax3.axvline(x=0, color='red', linestyle='--')
+        ax3.axvline(x=np.mean(df['v_azimuthal_gc'].dropna()), color='blue', linestyle='-')
+        ax3.set_xlabel('Azimuthal Velocity (km/s)')
+        ax3.set_ylabel('Density')
+        ax3.set_title(f'Velocity Distribution (Mean: {np.mean(df["v_azimuthal_gc"].dropna()):.2f} km/s)')
+        
+        # Plot 4: Correlation with galactic longitude
+        lon_bins = np.linspace(0, 360, 36)
+        lon_centers = (lon_bins[:-1] + lon_bins[1:]) / 2
+        mean_v_by_lon = []
+        
+        for i in range(len(lon_bins)-1):
+            mask = (df['l'] >= lon_bins[i]) & (df['l'] < lon_bins[i+1])
+            if np.sum(mask) > 10:
+                mean_v_by_lon.append(np.mean(df[mask]['v_azimuthal_gc']))
+            else:
+                mean_v_by_lon.append(np.nan)
+        
+        ax4.plot(lon_centers, mean_v_by_lon, 'go-')
+        ax4.axhline(y=0, color='red', linestyle='--', alpha=0.7)
+        ax4.set_xlabel('Galactic Longitude (deg)')
+        ax4.set_ylabel('Mean Azimuthal Velocity (km/s)')
+        ax4.set_title('Systematic Rotation vs. Galactic Position')
+        ax4.grid(True, alpha=0.3)
+        
+        plt.tight_layout()
+        return fig
+    
+    def statistical_significance_test(self, df):
+        """
+        Test statistical significance of observed rotation.
+        """
+        v_azimuthal = df['v_azimuthal_gc'].dropna()
+        
+        # Test if mean is significantly different from zero
+        from scipy import stats
+        t_stat, p_value = stats.ttest_1samp(v_azimuthal, 0)
+        
+        # Calculate effect size (Cohen's d)
+        cohen_d = np.abs(np.mean(v_azimuthal)) / np.std(v_azimuthal)
+        
+        print("\n" + "="*50)
+        print("STATISTICAL ANALYSIS OF FRAME DRAGGING")
+        print("="*50)
+        print(f"Sample size: {len(v_azimuthal):,} stars")
+        print(f"Mean azimuthal velocity: {np.mean(v_azimuthal):.3f} ± {np.std(v_azimuthal)/np.sqrt(len(v_azimuthal)):.3f} km/s")
+        print(f"Standard deviation: {np.std(v_azimuthal):.3f} km/s")
+        print(f"t-statistic: {t_stat:.3f}")
+        print(f"p-value: {p_value:.2e}")
+        print(f"Effect size (Cohen's d): {cohen_d:.3f}")
+        print("\nInterpretation:")
+        if p_value < 0.001:
+            print("*** HIGHLY SIGNIFICANT systematic rotation detected! ***")
+            if cohen_d > 0.1:
+                print("*** Effect size suggests REAL physical phenomenon ***")
+            else:
+                print("Statistically significant but small effect - needs further investigation")
+        elif p_value < 0.05:
+            print("* Significant systematic rotation detected")
+        else:
+            print("No significant systematic rotation found")
+        print("="*50)
+        
+        return t_stat, p_value, cohen_d
+
+# Example usage
+if __name__ == "__main__":
+    # Initialize analyzer
+    analyzer = FrameDraggingAnalyzer()
+    
+    # Download and analyze data
+    print("Starting frame dragging analysis...")
+    df = analyzer.download_gaia_subset(50000)  # Start with smaller sample
+    
+    print("Calculating galactic velocities...")
+    df = analyzer.calculate_galactic_velocities(df)
+    
+    print("Detecting frame dragging signatures...")
+    df = analyzer.detect_frame_dragging_signature(df)
+    
+    print("Analyzing rotation patterns...")
+    r_centers, mean_v_az, std_v_az = analyzer.analyze_rotation_pattern(df)
+    
+    # Create plots
+    fig = analyzer.plot_frame_dragging_evidence(df, r_centers, mean_v_az, std_v_az)
+    plt.show()
+    
+    # Statistical test
+    t_stat, p_value, cohen_d = analyzer.statistical_significance_test(df)
+    
+    # Save results
+    df.to_csv('gaia_frame_dragging_analysis.csv', index=False)
+    fig.savefig('frame_dragging_evidence.png', dpi=300, bbox_inches='tight')
+    
+    print("\nAnalysis complete! Check the plots and statistical results.")

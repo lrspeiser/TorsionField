@@ -2,8 +2,6 @@ import pandas as pd
 import numpy as np
 import gzip
 from pathlib import Path
-import os
-from tqdm import tqdm
 import streamlit as st
 from io import BytesIO
 
@@ -44,7 +42,7 @@ def load_local_gaia_files(file_paths, sample_size=50000, filter_params=None):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    for i, file_path in enumerate(file_paths):
+    for file_path in file_paths:
         status_text.text(f"Loading {file_path}...")
         
         try:
@@ -52,34 +50,7 @@ def load_local_gaia_files(file_paths, sample_size=50000, filter_params=None):
             with gzip.open(file_path, 'rt') as f:
                 # Read in chunks to manage memory
                 chunk_size = 10000
-                chunk_iter = pd.read_csv(f, chunksize=chunk_size, low_memory=False)
-                
-                for chunk_idx, chunk in enumerate(chunk_iter):
-                    # Ensure all required columns exist
-                    missing_cols = [col for col in required_cols if col not in chunk.columns]
-                    if missing_cols:
-                        status_text.warning(f"Missing columns in file {file_path}: {missing_cols}")
-                        # Try to continue with available columns
-                        for col in missing_cols:
-                            if col == 'radial_velocity':
-                                chunk[col] = np.nan  # Can proceed without radial velocity
-                            elif col == 'l' or col == 'b':
-                                # Calculate galactic coordinates if not available
-                                if 'ra' in chunk.columns and 'dec' in chunk.columns:
-                                    from astropy.coordinates import SkyCoord
-                                    import astropy.units as u
-                                    coords = SkyCoord(ra=chunk['ra'].values*u.degree, 
-                                                    dec=chunk['dec'].values*u.degree,
-                                                    frame='icrs')
-                                    galactic = coords.galactic
-                                    if col == 'l':
-                                        chunk[col] = galactic.l.degree
-                                    else:
-                                        chunk[col] = galactic.b.degree
-                                else:
-                                    chunk[col] = np.nan
-                            else:
-                                raise ValueError(f"Essential column {col} is missing and cannot be derived")
+                for chunk in pd.read_csv(f, chunksize=chunk_size, low_memory=False):
                     
                     # Filter for good quality data
                     mask = (
