@@ -89,13 +89,15 @@ def plot_stellar_proper_motions(df, max_stars=2000):
         name=f'{ref_value} mas/yr'
     ))
     
-    # Update layout
+    # Update layout with axis ranges
     fig.update_layout(
         title="Stellar Proper Motions in Galactic Coordinates",
         xaxis_title="Galactic Longitude (l) [deg]",
         yaxis_title="Galactic Latitude (b) [deg]",
         hovermode='closest',
         height=700,
+        xaxis=dict(range=[40, -40], autorange="reversed"),  # Center on l=0
+        yaxis=dict(range=[-30, 30]),
         legend=dict(
             yanchor="top",
             y=0.99,
@@ -103,10 +105,6 @@ def plot_stellar_proper_motions(df, max_stars=2000):
             x=0.01
         )
     )
-    
-    # Set axis ranges to focus on the galactic center region
-    fig.update_xaxis(range=[40, -40], autorange="reversed")  # Center on l=0
-    fig.update_yaxis(range=[-30, 30])
     
     return fig
 
@@ -194,13 +192,15 @@ def plot_frame_dragging_vectors(df, max_stars=2000):
         name=f'{ref_value} μas/yr'
     ))
     
-    # Update layout
+    # Update layout with axis ranges
     fig.update_layout(
         title="Frame Dragging Effect Vectors in Galactic Coordinates",
         xaxis_title="Galactic Longitude (l) [deg]",
         yaxis_title="Galactic Latitude (b) [deg]",
         hovermode='closest',
         height=700,
+        xaxis=dict(range=[40, -40], autorange="reversed"),  # Center on l=0
+        yaxis=dict(range=[-30, 30]),
         legend=dict(
             yanchor="top",
             y=0.99,
@@ -208,10 +208,6 @@ def plot_frame_dragging_vectors(df, max_stars=2000):
             x=0.01
         )
     )
-    
-    # Set axis ranges to focus on the galactic center region
-    fig.update_xaxis(range=[40, -40], autorange="reversed")  # Center on l=0
-    fig.update_yaxis(range=[-30, 30])
     
     return fig
 

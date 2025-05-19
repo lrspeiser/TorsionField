@@ -1,0 +1,146 @@
+
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+Galactic Center Frame Dragging Analysis
+This application analyzes stellar motion around the galactic center to detect signatures of frame dragging - a relativistic effect predicted by Einstein's General Theory of Relativity where a massive rotating object drags the fabric of spacetime around it.
+
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+0
+Spacetime curvature illustration
+
+What is Frame Dragging?
+Frame dragging is a relativistic effect where a massive rotating object (like Sagittarius A*, our galaxy's central black hole) drags the spacetime fabric around it, causing nearby objects to be pulled along in the direction of rotation.
+
+This application analyzes stellar motion data from the Gaia catalog to detect these subtle signatures by:
+
+Filtering high-quality stellar data
+Calculating expected frame dragging effects
+Performing statistical analysis
+Visualizing the results
+1. Data Loading and Preprocessing
+Upload your Gaia data files (.csv.gz format) or use sample data
+
+Upload Gaia data files (.csv.gz)
+
+No file chosen
+Drag and drop files here
+Limit 200MB per file • CSV.GZ
+
+Sample size
+
+1000
+100000
+Data Quality Filters
+Max proper motion RA error (mas/yr)
+
+0.10
+2.00
+Max proper motion Dec error (mas/yr)
+
+0.10
+2.00
+Min parallax (mas)
+
+0.05
+1.00
+Min absolute galactic latitude |b| (deg)
+
+0
+30
+Max G-band magnitude
+
+10.00
+20.00
+
+2. Frame Dragging Analysis
+Configure frame dragging detection parameters:
+
+Sgr A* mass (million solar masses)
+
+4.15
+
+
+Distance to Galactic Center (kpc)
+
+8.12
+
+
+Sgr A* dimensionless spin parameter
+
+0.00
+0.99
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+0
+Galactic center visualization
+
+
+Frame dragging analysis completed successfully
+
+Frame Dragging Signature Results
+Avg. Frame Dragging Effect (μas/yr)
+
+0.000
+Max Frame Dragging Effect (μas/yr)
+
+0.000
+Signal-to-Noise Ratio
+
+0.00
+Galactic Rotation Analysis
+Mean Azimuthal Velocity (km/s)
+
+1.014
+±0.349
+Statistical Significance
+
+Significant
+p-value
+
+0.003698
+Effect Size (Cohen's d)
+
+0.029
+Interpretation: Moderate evidence of frame dragging
+
+Rotation Curve
+0
+Detailed Results (sample)
+3. Statistical Validation
+Configure statistical validation parameters:
+
+Confidence level (%)
+
+90
+99
+Number of Monte Carlo simulations
+
+100
+10000
+Null hypothesis model
+
+Random stellar motions
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+0
+Stellar motion patterns
+
+
+4. Interactive Visualization
+Select visualization type
+
+Proper Motion Vectors
+AttributeError: 'Figure' object has no attribute 'update_xaxis'
+Traceback:
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/exec_code.py", line 121, in exec_func_with_error_handling
+    result = func()
+             ^^^^^^
+File "/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 645, in code_to_exec
+    exec(code, module.__dict__)
+File "/home/runner/workspace/app.py", line 347, in <module>
+    fig = plot_stellar_proper_motions(st.session_state.analysis_results)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "/home/runner/workspace/visualization.py", line 108, in plot_stellar_proper_motions
+    fig.update_xaxis(range=[40, -40], autorange="reversed")  # Center on l=0
+    ^^^^^^^^^^^^^^^^
