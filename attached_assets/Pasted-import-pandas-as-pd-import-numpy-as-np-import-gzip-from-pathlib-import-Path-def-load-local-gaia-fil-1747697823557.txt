@@ -1,0 +1,99 @@
+import pandas as pd
+import numpy as np
+import gzip
+from pathlib import Path
+
+def load_local_gaia_files(file_paths, sample_size=50000):
+    """
+    Load and sample from local Gaia CSV.gz files.
+    
+    Parameters:
+    -----------
+    file_paths : list
+        List of paths to GaiaSource_*.csv.gz files
+    sample_size : int
+        Number of stars to randomly sample
+    """
+    
+    # Columns we need for frame dragging analysis
+    required_cols = [
+        'source_id', 'ra', 'dec', 'pmra', 'pmdec', 
+        'radial_velocity', 'parallax', 'l', 'b',
+        'pmra_error', 'pmdec_error', 'phot_g_mean_mag'
+    ]
+    
+    all_data = []
+    total_loaded = 0
+    
+    for file_path in file_paths:
+        print(f"Loading {file_path}...")
+        
+        # Read compressed CSV
+        with gzip.open(file_path, 'rt') as f:
+            # Read in chunks to manage memory
+            chunk_size = 10000
+            for chunk in pd.read_csv(f, chunksize=chunk_size, low_memory=False):
+                
+                # Filter for good quality data
+                mask = (
+                    chunk['pmra'].notna() & 
+                    chunk['pmdec'].notna() &
+                    (chunk['pmra_error'] < 1.0) &
+                    (chunk['pmdec_error'] < 1.0) &
+                    (chunk['parallax'] > 0.1) &
+                    (abs(chunk['b']) > 10) &
+                    (chunk['phot_g_mean_mag'] < 16)
+                )
+                
+                good_data = chunk[mask][required_cols]
+                
+                if len(good_data) > 0:
+                    all_data.append(good_data)
+                    total_loaded += len(good_data)
+                    
+                    print(f"  Loaded {total_loaded} good stars so far...")
+                    
+                    # Stop if we have enough
+                    if total_loaded >= sample_size:
+                        break
+        
+        if total_loaded >= sample_size:
+            break
+    
+    # Combine all data
+    if all_data:
+        df = pd.concat(all_data, ignore_index=True)
+        
+        # Randomly sample to exact size
+        if len(df) > sample_size:
+            df = df.sample(n=sample_size, random_state=42)
+        
+        print(f"\nFinal dataset: {len(df):,} stars")
+        return df
+    else:
+        raise ValueError("No good quality data found!")
+
+# Example usage:
+if __name__ == "__main__":
+    # List your downloaded Gaia files here
+    gaia_files = [
+        "GaiaSource_000000-003111.csv.gz",
+        "GaiaSource_003112-005263.csv.gz",
+        # Add more files as needed
+    ]
+    
+    # Check which files exist
+    existing_files = [f for f in gaia_files if Path(f).exists()]
+    
+    if not existing_files:
+        print("No Gaia files found! Please download some files first.")
+        print("Or better yet, use the original script with automatic download!")
+    else:
+        print(f"Found {len(existing_files)} Gaia files")
+        
+        # Load and process
+        df = load_local_gaia_files(existing_files, sample_size=50000)
+        
+        # Continue with the frame dragging analysis
+        # (use the rest of the original script here)
+        print("Now run the frame dragging analysis on this data...")
