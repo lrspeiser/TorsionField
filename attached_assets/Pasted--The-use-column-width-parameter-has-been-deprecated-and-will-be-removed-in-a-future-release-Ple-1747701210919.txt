@@ -1,0 +1,147 @@
+
+
+
+
+
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+Galactic Center Frame Dragging Analysis
+This application analyzes stellar motion around the galactic center to detect signatures of frame dragging - a relativistic effect predicted by Einstein's General Theory of Relativity where a massive rotating object drags the fabric of spacetime around it.
+
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+0
+Spacetime curvature illustration
+
+What is Frame Dragging?
+Frame dragging is a relativistic effect where a massive rotating object (like Sagittarius A*, our galaxy's central black hole) drags the spacetime fabric around it, causing nearby objects to be pulled along in the direction of rotation.
+
+This application analyzes stellar motion data from the Gaia catalog to detect these subtle signatures by:
+
+Filtering high-quality stellar data
+Calculating expected frame dragging effects
+Performing statistical analysis
+Visualizing the results
+1. Data Loading and Preprocessing
+Choose a data source or upload your own Gaia files
+
+Select data source:
+
+
+Upload Files
+
+
+Sample Data
+
+
+Fetch from Gaia Archive
+
+This will download data directly from the ESA Gaia archive. It may take several minutes.
+
+The data will be cached for future use to avoid repeated downloads.
+
+Sample size
+
+1000
+100000
+Data Quality Filters
+Max proper motion RA error (mas/yr)
+
+0.10
+2.00
+Max proper motion Dec error (mas/yr)
+
+0.10
+2.00
+Min parallax (mas)
+
+0.05
+1.00
+Min absolute galactic latitude |b| (deg)
+
+0
+30
+Max G-band magnitude
+
+10.00
+20.00
+
+2. Frame Dragging Analysis
+Configure frame dragging detection parameters:
+
+Sgr A* mass (million solar masses)
+
+4.15
+
+
+Distance to Galactic Center (kpc)
+
+8.12
+
+
+Sgr A* dimensionless spin parameter
+
+0.00
+0.99
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+0
+Galactic center visualization
+
+
+Database URL not found. Some features may not work.
+
+3. Statistical Validation
+Configure statistical validation parameters:
+
+Confidence level (%)
+
+90
+99
+Number of Monte Carlo simulations
+
+100
+10000
+Null hypothesis model
+
+Random stellar motions
+The use_column_width parameter has been deprecated and will be removed in a future release. Please utilize the use_container_width parameter instead.
+
+0
+Stellar motion patterns
+
+
+4. Interactive Visualization
+Select visualization type
+
+Proper Motion Vectors
+Export Publication-Quality Figure
+DPI
+
+100
+600
+Figure width (inches)
+
+4
+12
+Figure height (inches)
+
+3
+10
+
+Figure title
+
+Frame Dragging Effect in Galactic Center Stars
+
+Error generating publication figure: Too many bins for data range. Cannot create 30 finite-sized bins.
+
+Frame Dragging Detection Platform
+This application was developed to analyze stellar motion around the galactic center and detect the relativistic frame dragging effect.
+
+The analysis includes:
+
+Data quality filtering based on parallax, proper motion errors, and other parameters
+Calculation of expected frame dragging signatures
+Statistical validation with Monte Carlo simulations
+Interactive visualization of results
+Export capabilities for publication-quality figures

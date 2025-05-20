@@ -47,8 +47,15 @@ class FrameDraggingAnalysis(Base):
 def init_db():
     db_url = os.environ.get('DATABASE_URL')
     if not db_url:
-        st.error("Database URL not found. Some features may not work.")
-        return None
+        st.warning("Database URL not found in environment. Using fallback connection.")
+        # Try PostgreSQL default credentials
+        db_user = os.environ.get('PGUSER', 'postgres')
+        db_pass = os.environ.get('PGPASSWORD', 'postgres')
+        db_host = os.environ.get('PGHOST', 'localhost')
+        db_port = os.environ.get('PGPORT', '5432')
+        db_name = os.environ.get('PGDATABASE', 'postgres')
+        
+        db_url = f"postgresql://{db_user}:{db_pass}@{db_host}:{db_port}/{db_name}"
     
     try:
         engine = create_engine(db_url)
