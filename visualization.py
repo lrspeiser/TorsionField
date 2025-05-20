@@ -299,7 +299,7 @@ def plot_statistical_results(mc_results, ci_results, p_values):
     fig.add_annotation(
         text=f"p-value: {p_values['correlation_p_value']:.4f}",
         x=0.95, y=0.95,
-        xref="x2 domain", yref="y2 domain",
+        xref="x2", yref="y2",
         showarrow=False,
         font=dict(color="black", size=12),
         bgcolor="white",
@@ -333,7 +333,7 @@ def plot_statistical_results(mc_results, ci_results, p_values):
     fig.add_annotation(
         text=f"p-value: {p_values['alignment_p_value']:.4f}",
         x=0.95, y=0.95,
-        xref="x3 domain", yref="y3 domain",
+        xref="x3", yref="y3",
         showarrow=False,
         font=dict(color="black", size=12),
         bgcolor="white",

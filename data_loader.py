@@ -138,19 +138,14 @@ def preprocess_stellar_data(df):
         # Constants
         k = 4.74057  # Conversion factor from mas/yr to km/s at 1 kpc
         
-        # For stars with radial velocity
-        rv_stars = df_processed[has_rv]
-        
-        # Calculate tangential velocity components
-        rv_stars['v_l'] = k * rv_stars['distance_pc'] * rv_stars['pmra'] / 1000.0  # km/s
-        rv_stars['v_b'] = k * rv_stars['distance_pc'] * rv_stars['pmdec'] / 1000.0  # km/s
+        # Calculate velocity components directly on the dataframe using .loc
+        # This avoids the SettingWithCopyWarning
+        # Calculate tangential velocity components directly
+        df_processed.loc[has_rv, 'v_l'] = k * df_processed.loc[has_rv, 'distance_pc'] * df_processed.loc[has_rv, 'pmra'] / 1000.0  # km/s
+        df_processed.loc[has_rv, 'v_b'] = k * df_processed.loc[has_rv, 'distance_pc'] * df_processed.loc[has_rv, 'pmdec'] / 1000.0  # km/s
         
         # Include radial velocity
-        rv_stars['v_r'] = rv_stars['radial_velocity']  # km/s
-        
-        # Update the processed dataframe
-        for col in ['v_l', 'v_b', 'v_r']:
-            df_processed.loc[has_rv, col] = rv_stars[col]
+        df_processed.loc[has_rv, 'v_r'] = df_processed.loc[has_rv, 'radial_velocity']  # km/s
     
     # For all stars, calculate projected galactocentric distance
     # Assuming R_0 = 8.122 kpc (distance to galactic center)
