@@ -46,7 +46,7 @@ st.set_page_config(
 
 # Define the sidebar
 st.sidebar.title("Frame Dragging Analysis")
-st.sidebar.image("https://pixabay.com/get/g938cb325df28fac9908bd3f403b5d188532a8be60777d2b0d8bccddcc6cee83b5b2187bf8a4cd1258731e1950b35cb60b9ba0f674d2172955985e96987708a87_1280.jpg", use_column_width=True)
+st.sidebar.image("https://pixabay.com/get/g938cb325df28fac9908bd3f403b5d188532a8be60777d2b0d8bccddcc6cee83b5b2187bf8a4cd1258731e1950b35cb60b9ba0f674d2172955985e96987708a87_1280.jpg", use_container_width=True)
 
 # Main page content
 st.title("Galactic Center Frame Dragging Analysis")
@@ -60,7 +60,7 @@ drags the fabric of spacetime around it.
 col1, col2 = st.columns([2, 1])
 with col1:
     st.image("https://pixabay.com/get/g27c36bb22cc70152c5d5fd03aec0ae7202fb7bb8ab0bab3312dd744e8f5eaea38e0bed9c86aaf0c42c1cbff8afe7a19b51e0340d3cf495e375ae8abfa638c8c3_1280.jpg", 
-             caption="Spacetime curvature illustration", use_column_width=True)
+             caption="Spacetime curvature illustration", use_container_width=True)
 with col2:
     st.write("""
     ## What is Frame Dragging?
@@ -213,7 +213,7 @@ if 'processed_data' in st.session_state:
     
     with col2:
         st.image("https://pixabay.com/get/g8d6d9ce5602b0b5cc8229dc15f5da7eb502ae610faec062b2a447853ba4d252edcec32bb808e6c81af5c850dcc2a32abfed4dbf6eddcd18e08755d25e1657139_1280.jpg", 
-                 caption="Galactic center visualization", use_column_width=True)
+                 caption="Galactic center visualization", use_container_width=True)
     
     # Run frame dragging analysis
     if st.button("Run Frame Dragging Analysis"):
