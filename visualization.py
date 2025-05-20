@@ -505,6 +505,12 @@ def create_publication_figure(fig_data):
     figsize = fig_data['figsize']
     title = fig_data['title']
     
+    # Make sure we have sufficient data for histograms
+    if mc_results and 'simulated_fd_effects' in mc_results:
+        sim_values = mc_results['simulated_fd_effects']
+        if len(sim_values) < 10:
+            include_statistical = False
+    
     # Create figure with subplots
     if include_statistical and mc_results is not None:
         fig, axes = plt.subplots(2, 2, figsize=figsize, dpi=dpi)
@@ -621,7 +627,18 @@ def create_publication_figure(fig_data):
     if include_statistical and mc_results is not None and len(axes) > 2:
         # Plot histogram of frame dragging effect
         ax = axes[2]
-        ax.hist(mc_results['simulated_fd_effects'], bins=30, alpha=0.7, color='blue')
+        # Calculate appropriate number of bins
+        sim_values = mc_results['simulated_fd_effects']
+        data_range = np.max(sim_values) - np.min(sim_values)
+        
+        # Prevent too many bins for small data ranges
+        if data_range > 0:
+            # Use sturges formula for bin number estimation
+            num_bins = min(30, max(5, int(np.log2(len(sim_values)) + 1)))
+        else:
+            num_bins = 5
+            
+        ax.hist(sim_values, bins=num_bins, alpha=0.7, color='blue')
         ax.axvline(mc_results['actual_fd_effect'], color='red', linestyle='--')
         ax.set_xlabel('Frame Dragging Effect (μas/yr)')
         ax.set_ylabel('Frequency')

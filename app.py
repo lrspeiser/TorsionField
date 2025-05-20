@@ -331,7 +331,7 @@ if 'analysis_results' in st.session_state:
     
     with col2:
         st.image("https://pixabay.com/get/g8f1501f5e51954f4f87faddf9a3cdd718acbe85b3ee7fc7e71f69d89b72e4babc9274805c5e90979bda8b2eedf36524ca63103c0ff9808060e3b484c58b25b87_1280.jpg", 
-                 caption="Stellar motion patterns", use_column_width=True)
+                 caption="Stellar motion patterns", use_container_width=True)
                  
     # Save analysis to database option
     if 'relativistic_parameters' in st.session_state and db_session:
