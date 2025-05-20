@@ -29,6 +29,13 @@ from visualization import (
 )
 from utils import save_results, get_sample_file_path
 from gaia_fetcher import fetch_gaia_data, cache_gaia_data
+from database import (
+    init_db, 
+    save_analysis_results,
+    get_all_analyses,
+    analyses_to_dataframe,
+    get_analysis_by_id
+)
 
 # Set page configuration
 st.set_page_config(
@@ -301,6 +308,13 @@ if 'processed_data' in st.session_state:
             except Exception as e:
                 st.error(f"Error in frame dragging analysis: {str(e)}")
 
+# Database initialization
+db_session = init_db()
+if db_session:
+    st.sidebar.success("Database connected successfully")
+else:
+    st.sidebar.warning("Database connection failed. Analysis results won't be saved.")
+
 # Statistical validation section (only show if analysis is completed)
 if 'analysis_results' in st.session_state:
     st.header("3. Statistical Validation")
@@ -318,6 +332,49 @@ if 'analysis_results' in st.session_state:
     with col2:
         st.image("https://pixabay.com/get/g8f1501f5e51954f4f87faddf9a3cdd718acbe85b3ee7fc7e71f69d89b72e4babc9274805c5e90979bda8b2eedf36524ca63103c0ff9808060e3b484c58b25b87_1280.jpg", 
                  caption="Stellar motion patterns", use_column_width=True)
+                 
+    # Save analysis to database option
+    if 'relativistic_parameters' in st.session_state and db_session:
+        st.subheader("Save Analysis to Database")
+        analysis_description = st.text_input("Analysis description", "Frame dragging analysis of galactic center stars")
+        
+        if st.button("Save Analysis Results"):
+            with st.spinner("Saving analysis to database..."):
+                # Determine source type
+                if 'using_sample' in st.session_state and st.session_state.using_sample:
+                    source_type = "synthetic_sample"
+                elif 'using_online' in st.session_state and st.session_state.using_online:
+                    source_type = "gaia_archive"
+                else:
+                    source_type = "uploaded_files"
+                
+                # Get parameters for saving
+                sgr_a_mass = st.session_state.relativistic_parameters.get('schwarzschild_radius_pc', 0) / 2.95e-13  # Convert back to solar masses
+                sgr_a_distance = 8.122  # Default value in kpc
+                sgr_a_spin = 0.9  # Default spin parameter
+                
+                # Get hypothesis results and p-values if statistical validation was done
+                p_values = st.session_state.get('p_values', None)
+                hypothesis_results = st.session_state.get('hypothesis_results', None)
+                
+                # Save to database
+                success = save_analysis_results(
+                    description=analysis_description,
+                    source_type=source_type,
+                    sample_size=len(st.session_state.analysis_results),
+                    sgr_a_mass=sgr_a_mass,
+                    sgr_a_distance=sgr_a_distance,
+                    sgr_a_spin=sgr_a_spin,
+                    analysis_results=st.session_state.analysis_results,
+                    rel_params=st.session_state.relativistic_parameters,
+                    p_values=p_values,
+                    hypothesis_results=hypothesis_results
+                )
+                
+                if success:
+                    st.success("Analysis saved to database successfully!")
+                else:
+                    st.error("Failed to save analysis. Please check database connection.")
     
     # Run statistical validation
     if st.button("Run Statistical Validation"):
@@ -414,9 +471,9 @@ if 'analysis_results' in st.session_state:
     with col1:
         dpi = st.slider("DPI", 100, 600, 300, 10)
     with col2:
-        fig_width = st.slider("Figure width (inches)", 4, 12, 8, 0.5)
+        fig_width = st.slider("Figure width (inches)", 4, 12, 8)
     with col3:
-        fig_height = st.slider("Figure height (inches)", 3, 10, 6, 0.5)
+        fig_height = st.slider("Figure height (inches)", 3, 10, 6)
         
     include_statistical = st.checkbox("Include statistical results", value=True)
     
