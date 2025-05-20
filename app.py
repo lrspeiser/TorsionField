@@ -28,6 +28,7 @@ from visualization import (
     create_publication_figure
 )
 from utils import save_results, get_sample_file_path
+from gaia_fetcher import fetch_gaia_data, cache_gaia_data
 
 # Set page configuration
 st.set_page_config(
@@ -70,13 +71,35 @@ with col2:
 
 # Data loading section
 st.header("1. Data Loading and Preprocessing")
-st.write("Upload your Gaia data files (.csv.gz format) or use sample data")
+st.write("Choose a data source or upload your own Gaia files")
 
-uploaded_files = st.file_uploader("Upload Gaia data files (.csv.gz)", 
-                                  type=["csv.gz"], 
-                                  accept_multiple_files=True)
+# Add tabs for different data sources
+data_source = st.radio(
+    "Select data source:",
+    ["Upload Files", "Sample Data", "Fetch from Gaia Archive"],
+    horizontal=True
+)
 
-use_sample_data = st.checkbox("Use sample data instead")
+if data_source == "Upload Files":
+    uploaded_files = st.file_uploader("Upload Gaia data files (.csv.gz)", 
+                                      type=["csv.gz"], 
+                                      accept_multiple_files=True)
+    use_sample_data = False
+    fetch_from_gaia = False
+    
+elif data_source == "Sample Data":
+    st.info("Using synthetic sample data (includes a frame dragging signal)")
+    uploaded_files = None
+    use_sample_data = True
+    fetch_from_gaia = False
+    
+else:  # Fetch from Gaia Archive
+    st.warning("This will download data directly from the ESA Gaia archive. It may take several minutes.")
+    uploaded_files = None
+    use_sample_data = False
+    fetch_from_gaia = True
+    st.info("The data will be cached for future use to avoid repeated downloads.")
+
 sample_size = st.slider("Sample size", min_value=1000, max_value=100000, value=10000, step=1000)
 
 # Data filtering parameters
@@ -104,7 +127,7 @@ filter_params = {
 if st.button("Load and Preprocess Data"):
     with st.spinner("Loading and preprocessing data..."):
         try:
-            if uploaded_files and not use_sample_data:
+            if data_source == "Upload Files" and uploaded_files:
                 # Save uploaded files temporarily
                 temp_file_paths = []
                 for uploaded_file in uploaded_files:
@@ -115,11 +138,31 @@ if st.button("Load and Preprocess Data"):
                 
                 st.session_state.file_paths = temp_file_paths
                 st.session_state.using_sample = False
-            else:
-                # Use sample data
-                st.info("Using sample data files")
+                st.session_state.using_online = False
+                
+            elif data_source == "Sample Data":
+                # Use synthetic sample data
+                st.info("Using synthetic sample data with frame dragging signal")
                 st.session_state.file_paths = [get_sample_file_path()]
                 st.session_state.using_sample = True
+                st.session_state.using_online = False
+                
+            elif data_source == "Fetch from Gaia Archive":
+                # Fetch data from Gaia archive
+                st.info("Fetching data from Gaia Archive (this may take a while)")
+                
+                # Try to use cached data first
+                cached_files = cache_gaia_data()
+                
+                if cached_files:
+                    st.session_state.file_paths = cached_files
+                    st.session_state.using_sample = False
+                    st.session_state.using_online = True
+                else:
+                    st.error("Failed to fetch data from Gaia archive. Using sample data instead.")
+                    st.session_state.file_paths = [get_sample_file_path()]
+                    st.session_state.using_sample = True
+                    st.session_state.using_online = False
             
             # Load the data
             df = load_local_gaia_files(st.session_state.file_paths, sample_size=sample_size, filter_params=filter_params)
